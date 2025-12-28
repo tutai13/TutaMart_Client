@@ -1,6 +1,14 @@
 import { createRouter, createWebHistory } from "vue-router";
-import home from "../components/home.vue";
-const routes = [{ path: "/", name: "home", component: home }];
+import Cashier from "../components/Cashier.vue";
+import Dashboard from "../components/Dashboard.vue";
+import Inventory from "../components/Inventory.vue";
+import OrderList from "../components/OrderList.vue";
+const routes = [
+  { path: "/", name: "Dashboard", component: Dashboard },
+  { path: "/Cashier", name: "Cashier", component: Cashier },
+  { path: "/Inventory", name: "Inventory", component: Inventory },
+  { path: "/OrderList", name: "OrderList", component: OrderList },
+];
 const router = createRouter({
   history: createWebHistory(),
   routes,
