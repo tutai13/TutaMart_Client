@@ -14,9 +14,6 @@
         </div>
         <div>
           <h5 class="mb-0 fw-bold">Tutamart POS</h5>
-          <small class="text-muted"
-            >Station #04 • <span class="text-success">Online</span></small
-          >
         </div>
       </div>
 

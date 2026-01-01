@@ -213,7 +213,7 @@
             >Thanh toán</small
           >
           <div class="row g-1">
-            <div class="col-4">
+            <div class="col-6">
               <button
                 class="btn btn-success w-100 py-2 small position-relative"
               >
@@ -224,12 +224,12 @@
                 <i class="bi bi-cash"></i><br /><small>Tiến mặt</small>
               </button>
             </div>
-            <div class="col-4">
+            <!-- <div class="col-4">
               <button class="btn btn-outline-secondary w-100 py-2 small">
                 <i class="bi bi-credit-card"></i><br /><small>Thẻ</small>
               </button>
-            </div>
-            <div class="col-4">
+            </div> -->
+            <div class="col-6">
               <button class="btn btn-outline-secondary w-100 py-2 small">
                 <i class="bi bi-qr-code"></i><br /><small>QR</small>
               </button>
