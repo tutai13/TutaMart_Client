@@ -26,20 +26,30 @@
         </div>
 
         <div class="d-flex gap-2 overflow-x-auto pb-1">
-          <button class="btn btn-dark px-3 py-1 small fw-bold">
+          <!-- Nút All Items - luôn hiển thị đầu tiên -->
+          <button
+            class="btn px-3 py-1 small fw-bold"
+            :class="{
+              'btn-dark': selectedCategory === 'All Items',
+              'btn-outline-secondary': selectedCategory !== 'All Items',
+            }"
+            @click="selectCategory('All Items')"
+          >
             All Items
           </button>
-          <button class="btn btn-outline-secondary px-3 py-1 small">
-            Fresh Food
-          </button>
-          <button class="btn btn-outline-secondary px-3 py-1 small">
-            Beverages
-          </button>
-          <button class="btn btn-outline-secondary px-3 py-1 small">
-            Snacks
-          </button>
-          <button class="btn btn-outline-secondary px-3 py-1 small">
-            Household
+
+          <!-- Các category lấy từ API -->
+          <button
+            v-for="cat in categories"
+            :key="cat"
+            class="btn px-3 py-1 small"
+            :class="{
+              'btn-dark fw-bold': selectedCategory === cat,
+              'btn-outline-secondary': selectedCategory !== cat,
+            }"
+            @click="selectCategory(cat)"
+          >
+            {{ cat }}
           </button>
         </div>
       </div>
@@ -64,7 +74,7 @@
               />
               <span
                 class="position-absolute top-0 end-0 m-1 badge bg-dark bg-opacity-75 small"
-                >{{ product.stock }} left</span
+                >{{ product.stock }}</span
               >
               <span
                 v-if="product.discount"
@@ -146,8 +156,11 @@
             height="40"
             alt=""
           />
-          <div class="flex-grow-1">
-            <div class="fw-bold small">{{ item.name }}</div>
+          <div class="flex-grow-1 text-truncate-container">
+            <!-- Tên sản phẩm: cắt ngắn + tooltip khi hover -->
+            <div class="fw-bold small text-truncate-line" :title="item.name">
+              {{ item.name }}
+            </div>
             <small class="text-muted">{{ item.unitPrice }} / cái</small>
           </div>
           <div class="input-group input-group-sm" style="width: 80px">
@@ -161,7 +174,11 @@
               type="text"
               class="form-control text-center fw-bold small"
               :value="item.qty"
-              readonly
+              min="1"
+              style="width: 27px"
+              @input="updateQtyFromInput(item, $event.target.value)"
+              @keyup.enter="$event.target.blur()"
+              @blur="updateQtyFromInput(item, $event.target.value)"
             />
             <button
               class="btn btn-outline-secondary btn-sm"
@@ -187,24 +204,36 @@
         <div class="mb-2">
           <div class="d-flex justify-content-between small text-muted">
             <span>Tạm tính</span>
-            <span class="fw-bold">$14.90</span>
+            <span class="fw-bold">{{ formatVND(subtotal) }}</span>
           </div>
           <div class="d-flex justify-content-between small text-muted">
-            <span>Thuế (8%)</span>
-            <span class="fw-bold">$1.19</span>
+            <span>Thuế ({{ formatPercent(taxRate) }})</span>
+            <span class="fw-bold">{{ formatVND(tax) }}</span>
           </div>
           <div
-            class="d-flex justify-content-between align-items-center small text-warning mt-1"
+            class="d-flex justify-content-between align-items-center small mt-2"
           >
-            <button class="btn btn-link p-0 small">
-              <i class="bi bi-tag"></i> Giảm giá
-            </button>
-            <span>-$0.00</span>
+            <div class="d-flex align-items-center gap-2">
+              <button
+                class="btn btn-link p-0 small text-warning"
+                @click="showDiscountModal = true"
+              >
+                <i class="bi bi-tag"></i> Giảm giá
+              </button>
+
+              <!-- Hiển thị giảm giá đang áp dụng -->
+              <span class="text-danger fw-bold" v-if="discountAmount > 0">
+                -{{ formatVND(discountAmount) }}
+              </span>
+              <span class="text-muted" v-else>-0 ₫</span>
+            </div>
           </div>
           <hr class="my-2" />
           <div class="d-flex justify-content-between align-items-end">
             <span class="fw-bold small">Tổng cộng</span>
-            <h4 class="fw-black mb-0">$16.09</h4>
+            <h4 class="fw-black mb-0 text-success">
+              {{ formatVND(finalTotal) }}
+            </h4>
           </div>
         </div>
 
@@ -224,11 +253,6 @@
                 <i class="bi bi-cash"></i><br /><small>Tiến mặt</small>
               </button>
             </div>
-            <!-- <div class="col-4">
-              <button class="btn btn-outline-secondary w-100 py-2 small">
-                <i class="bi bi-credit-card"></i><br /><small>Thẻ</small>
-              </button>
-            </div> -->
             <div class="col-6">
               <button class="btn btn-outline-secondary w-100 py-2 small">
                 <i class="bi bi-qr-code"></i><br /><small>QR</small>
@@ -241,112 +265,282 @@
           <button class="btn btn-outline-secondary flex-grow-1 py-2 small">
             <i class="bi bi-printer"></i> In hóa đơn
           </button>
-          <button class="btn btn-success flex-grow-2 py-2 small fw-bold shadow">
+          <button
+            class="btn btn-success flex-grow-2 py-2 small fw-bold shadow"
+            :disabled="cartItems.length === 0"
+          >
             Hoàn tất <i class="bi bi-check-circle ms-1"></i>
           </button>
         </div>
       </div>
     </aside>
+    <!-- Modal Giảm giá -->
+    <div
+      class="modal fade"
+      :class="{ show: showDiscountModal }"
+      :style="{ display: showDiscountModal ? 'block' : 'none' }"
+      tabindex="-1"
+      @click.self="showDiscountModal = false"
+    >
+      <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+          <div class="modal-header border-0 pb-0">
+            <h6 class="modal-title fw-bold">Áp dụng giảm giá</h6>
+            <button
+              type="button"
+              class="btn-close"
+              @click="showDiscountModal = false"
+            ></button>
+          </div>
+          <div class="modal-body pt-2">
+            <div class="btn-group w-100 mb-3" role="group">
+              <button
+                class="btn btn-outline-primary"
+                :class="{ 'active btn-primary': discountType === 'amount' }"
+                @click="discountType = 'amount'"
+              >
+                Theo tiền
+              </button>
+              <button
+                class="btn btn-outline-primary"
+                :class="{ 'active btn-primary': discountType === 'percent' }"
+                @click="discountType = 'percent'"
+              >
+                Theo %
+              </button>
+            </div>
+
+            <div class="input-group">
+              <input
+                type="number"
+                class="form-control text-center"
+                v-model.number="discountValue"
+                :placeholder="
+                  discountType === 'percent' ? 'Nhập %' : 'Nhập số tiền'
+                "
+                min="0"
+              />
+              <span class="input-group-text">
+                {{ discountType === "percent" ? "%" : "₫" }}
+              </span>
+            </div>
+
+            <small class="text-muted d-block text-center mt-2">
+              Tạm tính: {{ formatVND(subtotal) }} → Giảm:
+              {{ formatVND(discountAmount) }}
+            </small>
+          </div>
+          <div class="modal-footer border-0 pt-0">
+            <button class="btn btn-secondary btn-sm" @click="clearDiscount">
+              Xóa giảm giá
+            </button>
+            <button
+              class="btn btn-success btn-sm"
+              @click="showDiscountModal = false"
+            >
+              Áp dụng
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overlay khi modal mở -->
+    <div
+      class="modal-backdrop fade"
+      :class="{ show: showDiscountModal }"
+      v-if="showDiscountModal"
+    ></div>
   </div>
 </template>
 
 <script setup>
-const cashierAvatar =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCpxMrRKW-izah0TzO2jLqmVXaJkl-DUpbzTIl8_F52YdfsTUeEdBm9IBGi2dfPbacTznh0lxyDfEP1j-P8CQHm4vB5CARJnbdiZm1cyDvhI7cA-bjUK_AOGVu-aPgTokCl8kqs_Xlydz3YlwxcYLaWXQdz2rQWbzdutiUXMKdvTKHOMrb-2agPeHx-MRweAltJdf67o4oM41c7halpG7mw3vrJyPPA4oKWkJWdGUradsYKAiJaPPbwnZKaSkhrTZ8nkte9pI5z7LRh";
+import { ref, onMounted, computed } from "vue";
+import axios from "axios";
 
-// Danh sách sản phẩm mẫu
-const products = [
-  {
-    id: 1,
-    name: "Fresh Whole Milk 1L",
-    category: "Dairy Products",
-    price: "$2.50",
-    stock: 54,
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuDYPNBPxoC_gSS_lsIaKdLRvohTJPW0bm2UmeH9-mDgPAvNe2LCe40sCsMFQLRNH2VtzPCwMa9MA6zeoyE1-lI_QLDDbKYnbP9aCyfWkkb6eRCjM2ipLPkdxJqTthBGiu8RdW7a8S3rgwEL1heaBpEaDm_sZfQGa2ZdMolI1o1WLFxxMyvezh0iN63iqPGKjGlXjjXN84wSIoxhHgavOW2afHPs_YMoigPA5Wt3v0-_2TasycO9fXaij046eOneZiPDrnVmZHQ35CNm",
-  },
-  {
-    id: 2,
-    name: "Classic Potato Chips",
-    category: "Snacks",
-    price: "$1.80",
-    stock: 120,
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuAwd1JgSkM2bvOXZA9-vKUl72LGTUG5bozEJHoIH5RYvnXUqGbF31S1IhUxpRmpBryc3XHMARYG_J-49qRnwktYJiHU7m6nyzAjL9gvlKWW6qt6qySSkOGtfRJuTQ5aHpwnc872xbDrKIh2uvJMQll_EG4N4dERZ5YYRxnDF_ZtDQzyScS2MH01V413C76iiNWG4TnDbOCiZ-b6rG3O2aMJDfMQP2DWwnjwAzlxcowbr22BNYGF0XD55LLy689n3eqWc0whMX7SWiLB",
-  },
-  {
-    id: 3,
-    name: "Fresh Orange Juice",
-    category: "Beverages",
-    price: "$2.70",
-    originalPrice: "$3.00",
-    discount: 10,
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuAcZUHB_HiJ-VsgSZYMWUelt4sYTNl6HBwrnGbCR74nlzKAdVaiRMfpkTeqMPEoRLUCChH8PDeTm3ExQ95WeovGbplqTxL-TLlcDVVTp58nibGsZG8OZzv0SkiK5F2z3mLicWJWpv9iUiRde8UWkurZBJJ2ibxN0f3E4ZbkbNIKXBZ01goTiBW_u6XX1w6Ddc-iaDoWNCOlq46cSZ_cZ7TvBU7y9kGYPLyfuEiY4DB6PsBf3pw5HZj3UMLI2lIU6JSKm2I5Or3si8qm",
-  },
-  {
-    id: 4,
-    name: "Dark Chocolate Bar",
-    category: "Snacks",
-    price: "$1.20",
-    lowStock: true,
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuCIgWoK1kmM_EZp9fslOWSJwPE7gB6nwXbXC5nkcvZ8OKqeQ9j9j43L8qM7G3lj3S3_JEXFn3Fg4YH4XqnplebQa1zfmXGl_WsPYRpImftO1HqKfKRoFx--81A6wjmgu-RXFA-Ix7C-prKmAe1Hd_F9CI1OPjIv3dG9nPHw_atcqlS_Bs8-xTzgAN59sufah5s4km7gb_Ew3z20pzlGzhWycaoSDUWoRnLol6oL62y3vwaespMe5N6lES7Lv6jzLrSCBH-nuK9G1X3_",
-  },
-  {
-    id: 5,
-    name: "Whole Wheat Bread",
-    category: "Bakery",
-    price: "$2.10",
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuBI1c2-zaYvUBIeiUiEk40ZOQid9atvXPT8ed3psiHFdqHTaXRE4i2SmDMYwynZ-F7K1gsexRFQW_9x7nIvMF8uPMMhREK5vyrNh88MHyGeRJ8vk3xYthkzHcZCUbrm7Ub-zRA3-8drBGaauo8WmbpD6YPEsfeAedSA-Y6pZAFEn6JIwNyxrrqDebJVog0FTjE_XL9qeAeVayqiVnjtqNvYqGsw6MyA22NO1cTWcTQpCO8uzdfl00dptUVRYsnEMvmHNb9BeTjFTiez",
-  },
-  {
-    id: 6,
-    name: "Mineral Water 500ml",
-    category: "Beverages",
-    price: "$0.80",
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuBn--WXGoGg98oz7bUUdDTQkfiPbFShcDi9_JlN5_PYQAqnSsRz5tNGhuG1KADdgVAOJC7Zb8q9wszLxPGsBpQ85fkYfdcSTOyWlmLMaum8RlRSzrq-C2tCcYnkA0q9Uzl4WksCVCB0SMgF0Hf37hfbt7RBO-piQAw9fabyV2JYoQ396LYQCzcrqyNBAnJRN7ojGHuLovelKTCCjojANCO5jvDyGBE2WSTpiKAx-B1kN7O3s08sXsg4_P-kABrF5-kcPeoXxH-DVc4x",
-  },
-];
+// Base URL của backend
 
-// Giỏ hàng mẫu
-const cartItems = [
-  {
-    id: 1,
-    name: "Fresh Whole Milk 1L",
-    thumb:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuDAQ4i41uULdpwByq9gS45u71lWeoJyPCgV0UH2W434xaLsSgD_6nxVTTt9UJ2maN65OBu-2zmrFJXa33ixsv1nBbvtSsBRdQ2ZgRfTByplzUZsEJDirNwqsCD0TVkaU6RUNR9xtQrAvvLLrnLR-iovTYrn-x8EBMevvjj6GKgVXmu7wHyYXXdZofyDBgn3OCZtZtXdpOMI-uDMdf34-NoC1KNdQpjiMqqjeh_ZMJC_MWYqDD5d9saDWR8fGvjGl3t8TRuTW-NPv-W7",
-    unitPrice: "$2.50",
-    qty: 2,
-    total: "$5.00",
-  },
-  {
-    id: 2,
-    name: "Classic Potato Chips",
-    thumb:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuCoV4oKAJPs1oU2858eNlgtfkkko-39mPsjnkgC9DX6JBuMYH6A-YNsLvk0iGaWKMecsa9W9qIY-3hTJLSVRy-FHWbtuqur1IDXi9cl9suZ7CEkOBl-MImzrTFqRMYJemqGHC2Escn8YFEghLo-ubaxtfbpk6_o5jqiGgj2u_s-kZaBWWOKG2uomqnNL5WIw8yjgfU4U_XYrKL3NtJhsVV_FpsntRBG3za4Awxvmhj3j2OvbFSogrkxtCziNe33BlUW3XQF3O7-i0gV",
-    unitPrice: "$1.80",
-    qty: 1,
-    total: "$1.80",
-  },
-  {
-    id: 3,
-    name: "Fresh Orange Juice",
-    thumb:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuCvQBrNDHJvaO7VJLfu5u0GTF0UGUNPJm2bCPyHOqk0xe4v7TS42W2zSchzzkKEToXk1vkDUVpOEn8lkvRf4NQwkrzl65SEWVwg_Ej6XMXX_euqCFmFymjeRHn_UdfJtu6c4hYUFLfmKByVYqMlBzf0XTX4zjZXQrv-m5E6ok8krifWRjBLSP4GZFYG9JdORsCNFgNK38gW3qJb_NwJ7mo_MAO1VKTa5vbXekV7A3aTar1scWTza1aXbei0XR5T4UAShAd9UGJDkQx1",
-    unitPrice: "$2.70",
-    qty: 3,
-    total: "$8.10",
-  },
-];
+// Danh sách sản phẩm gốc từ API
+const allProducts = ref([]);
 
-const addToCart = (product) => alert(`Đã thêm: ${product.name}`);
-const updateQty = (item, qty) => {
-  if (qty > 0) item.qty = qty;
+const discountType = ref("none");
+const discountValue = ref(0);
+const showDiscountModal = ref(false);
+// Sản phẩm hiển thị sau khi filter theo category
+const products = computed(() => {
+  if (selectedCategory.value === "All Items") {
+    return allProducts.value;
+  }
+  return allProducts.value.filter((p) => p.category === selectedCategory.value);
+});
+
+// Danh sách category lấy từ sản phẩm
+const categories = ref([]);
+const selectedCategory = ref("All Items");
+
+// Giỏ hàng
+const cartItems = ref([]);
+
+// Hàm lấy tất cả sản phẩm từ API
+const fetchProducts = async () => {
+  try {
+    const response = await axios.get(`https://localhost:7189/api/Products`);
+    const data = response.data;
+
+    if (!Array.isArray(data)) {
+      throw new Error("Dữ liệu không hợp lệ");
+    }
+
+    // Map dữ liệu API sang định dạng phù hợp với giao diện
+    allProducts.value = data.map((product) => ({
+      id: product.productId,
+      name: product.productName,
+      category: product.category?.categoryName || "Uncategorized",
+      price: new Intl.NumberFormat("vi-VN", {
+        style: "currency",
+        currency: "VND",
+      }).format(product.sellingPrice),
+      priceRaw: product.sellingPrice, // giữ giá gốc để tính toán
+      stock: product.quantity,
+      image: product.imageUrl?.startsWith("http")
+        ? product.imageUrl
+        : product.imageUrl
+        ? `https://localhost:7189` + product.imageUrl
+        : "https://via.placeholder.com/150?text=No+Image", // fallback nếu không có ảnh
+      discount: null, // có thể thêm sau nếu có khuyến mãi
+    }));
+
+    // Tự động lấy danh sách category duy nhất từ sản phẩm
+    const uniqueCats = [
+      ...new Set(data.map((p) => p.category?.categoryName).filter(Boolean)),
+    ];
+    categories.value = uniqueCats.sort(); // sắp xếp A-Z
+  } catch (error) {
+    console.error("Lỗi khi tải sản phẩm:", error);
+    alert("Không thể kết nối đến máy chủ. Vui lòng kiểm tra API đang chạy.");
+
+    // Fallback dữ liệu mẫu (tùy chọn, có thể bỏ nếu không muốn)
+    allProducts.value = [];
+    categories.value = ["Beverages", "Snacks"];
+  }
 };
-const removeItem = (item) => cartItems.splice(cartItems.indexOf(item), 1);
+
+// Chọn category → filter sản phẩm
+const selectCategory = (category) => {
+  selectedCategory.value = category;
+};
+
+// Thêm sản phẩm vào giỏ hàng
+const addToCart = (product) => {
+  const existingItem = cartItems.value.find((item) => item.id === product.id);
+
+  if (existingItem) {
+    // Nếu đã có → tăng số lượng
+    existingItem.qty += 1;
+    existingItem.total = new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(existingItem.priceRaw * existingItem.qty);
+  } else {
+    // Thêm mới
+    cartItems.value.push({
+      id: product.id,
+      name: product.name,
+      thumb: product.image,
+      unitPrice: product.price,
+      priceRaw: product.priceRaw,
+      qty: 1,
+      total: product.price,
+    });
+  }
+};
+
+// Cập nhật số lượng
+const updateQty = (item, newQty) => {
+  if (newQty <= 0) {
+    removeItem(item);
+    return;
+  }
+  item.qty = newQty;
+  item.total = new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+  }).format(item.priceRaw * newQty);
+};
+
+// Cập nhật số lượng từ input nhập tay
+const updateQtyFromInput = (item, value) => {
+  let newQty = parseInt(value) || 1; // Nếu nhập sai → mặc định 1
+
+  if (newQty < 1) newQty = 1;
+  if (newQty > item.stock) {
+    alert(`Chỉ còn ${item.stock} sản phẩm trong kho!`);
+    newQty = item.stock;
+  }
+
+  item.qty = newQty;
+  item.total = new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+  }).format(item.priceRaw * newQty);
+};
+// Xóa sản phẩm khỏi giỏ
+const removeItem = (item) => {
+  const index = cartItems.value.indexOf(item);
+  if (index > -1) {
+    cartItems.value.splice(index, 1);
+  }
+};
+// Tính tạm tính (subtotal) = tổng tiền các sản phẩm (priceRaw * qty)
+const subtotal = computed(() => {
+  return cartItems.value.reduce(
+    (sum, item) => sum + item.priceRaw * item.qty,
+    0
+  );
+});
+
+const formatPercent = (rate) => {
+  return `${Math.round(rate * 100)}%`;
+};
+// Tính thuế (8% của tạm tính)
+const taxRate = 0.08; // 8%
+const tax = computed(() => {
+  return subtotal.value * taxRate;
+});
+
+// Định dạng tiền tệ VND đẹp
+const formatVND = (amount) => {
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+  }).format(amount);
+};
+
+const discountAmount = computed(() => {
+  if (discountType.value === "amount") {
+    return Math.max(0, discountValue.value); // không âm
+  }
+  if (discountType.value === "percent") {
+    const percent = Math.max(0, Math.min(100, discountValue.value)); // giới hạn 0-100%
+    return (subtotal.value * percent) / 100;
+  }
+  return 0;
+});
+
+// Tổng cộng sau giảm giá + thuế
+const finalTotal = computed(() => {
+  return subtotal.value + tax.value - discountAmount.value;
+});
+// Xóa giảm giá
+const clearDiscount = () => {
+  discountType.value = "none";
+  discountValue.value = 0;
+  showDiscountModal.value = false;
+};
+// Tự động gọi khi component được mount
+onMounted(() => {
+  fetchProducts();
+});
 </script>
 
 <style scoped>
@@ -364,5 +558,23 @@ const removeItem = (item) => cartItems.splice(cartItems.indexOf(item), 1);
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+/* Container để giới hạn chiều rộng tên sản phẩm */
+.text-truncate-container {
+  min-width: 0; /* Rất quan trọng: cho phép flex child bị truncate */
+  flex: 1;
+}
+
+/* Cắt tên sản phẩm nếu quá dài, chỉ hiển thị 1 dòng */
+.text-truncate-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Khi hover vào tên → con trỏ chuột thành pointer (tùy chọn, cho biết có tooltip) */
+.text-truncate-line:hover {
+  cursor: pointer;
 }
 </style>
