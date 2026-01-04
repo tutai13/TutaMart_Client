@@ -237,43 +237,221 @@
           </div>
         </div>
 
-        <div class="mb-2">
-          <small class="text-uppercase fw-bold text-muted d-block mb-1"
-            >Thanh toán</small
-          >
-          <div class="row g-1">
+        <div class="mb-3">
+          <small class="text-uppercase fw-bold text-muted d-block mb-2">
+            Thanh toán
+          </small>
+          <div class="row g-2">
+            <!-- TIỀN MẶT -->
             <div class="col-6">
-              <button
-                class="btn btn-success w-100 py-2 small position-relative"
+              <input
+                type="radio"
+                class="btn-check"
+                name="payment"
+                id="pay-cash"
+                value="cash"
+                v-model="selectedPaymentMethod"
+                autocomplete="off"
+              />
+              <label
+                class="btn btn-outline-success w-100 py-3 small position-relative"
+                for="pay-cash"
               >
-                <div
-                  class="position-absolute top-0 end-0 m-1 bg-white rounded-circle"
-                  style="width: 6px; height: 6px"
-                ></div>
-                <i class="bi bi-cash"></i><br /><small>Tiến mặt</small>
-              </button>
+                <i class="bi bi-cash fs-4 d-block mb-1"></i>
+                <small>Tiền mặt</small>
+              </label>
             </div>
+
+            <!-- QR -->
             <div class="col-6">
-              <button class="btn btn-outline-secondary w-100 py-2 small">
-                <i class="bi bi-qr-code"></i><br /><small>QR</small>
-              </button>
+              <input
+                type="radio"
+                class="btn-check"
+                name="payment"
+                id="pay-qr"
+                value="qr"
+                v-model="selectedPaymentMethod"
+                autocomplete="off"
+              />
+              <label
+                class="btn btn-outline-success w-100 py-3 small position-relative"
+                for="pay-qr"
+              >
+                <i class="bi bi-qr-code-scan fs-4 d-block mb-1"></i>
+                <small>QR Code</small>
+              </label>
             </div>
           </div>
         </div>
 
-        <div class="d-flex gap-2">
+        <!-- <div class="d-flex gap-2">
           <button class="btn btn-outline-secondary flex-grow-1 py-2 small">
             <i class="bi bi-printer"></i> In hóa đơn
           </button>
           <button
             class="btn btn-success flex-grow-2 py-2 small fw-bold shadow"
-            :disabled="cartItems.length === 0"
+            :disabled="cartItems.length === 0 || isProcessing"
+            @click="completeOrder"
           >
+            <span
+              v-if="isProcessing"
+              class="spinner-border spinner-border-sm me-2"
+              role="status"
+            ></span>
             Hoàn tất <i class="bi bi-check-circle ms-1"></i>
           </button>
-        </div>
+        </div> -->
+        <button
+          class="btn btn-success w-100 py-3 fw-bold shadow-lg"
+          :disabled="cartItems.length === 0 || isProcessing"
+          @click="openPaymentModal"
+        >
+          <span
+            v-if="isProcessing"
+            class="spinner-border spinner-border-sm me-2"
+            role="status"
+          ></span>
+          {{ isProcessing ? "Đang xử lý..." : "Tiến hành thanh toán" }}
+          <i class="bi bi-arrow-right ms-2"></i>
+        </button>
       </div>
     </aside>
+
+    <!-- ==================== MODAL THANH TOÁN TIỀN MẶT ==================== -->
+    <div
+      class="modal fade"
+      :class="{ show: showCashModal }"
+      :style="{ display: showCashModal ? 'block' : 'none' }"
+      tabindex="-1"
+      @click.self="showCashModal = false"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header border-0">
+            <h5 class="modal-title fw-bold">Thanh toán tiền mặt</h5>
+            <button
+              type="button"
+              class="btn-close"
+              @click="showCashModal = false"
+            ></button>
+          </div>
+          <div class="modal-body pt-0">
+            <div class="text-center mb-4">
+              <h3 class="text-success fw-black">
+                Tổng tiền: {{ formatVND(finalTotal) }}
+              </h3>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Số tiền khách đưa</label>
+              <input
+                type="number"
+                class="form-control form-control-lg text-center"
+                v-model.number="cashReceived"
+                placeholder="0"
+                min="0"
+                @input="calculateChange"
+                ref="cashInput"
+              />
+            </div>
+
+            <div class="alert alert-info text-center py-3" v-if="change >= 0">
+              <h4 class="mb-0 fw-bold text-primary">
+                Tiền thối: {{ formatVND(change) }}
+              </h4>
+            </div>
+            <div class="alert alert-warning text-center py-3" v-else>
+              <small>Chưa đủ tiền!</small>
+            </div>
+          </div>
+          <div class="modal-footer border-0 flex-column gap-2">
+            <button
+              class="btn btn-outline-secondary w-100"
+              @click="printReceipt"
+              :disabled="change < 0"
+            >
+              <i class="bi bi-printer me-2"></i>In hóa đơn (sau khi hoàn tất)
+            </button>
+            <button
+              class="btn btn-success w-100 py-3 fw-bold"
+              @click="completeOrder"
+              :disabled="change < 0 || isProcessing"
+            >
+              <span
+                v-if="isProcessing"
+                class="spinner-border spinner-border-sm me-2"
+              ></span>
+              Hoàn tất thanh toán
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== MODAL THANH TOÁN QR ==================== -->
+    <div
+      class="modal fade"
+      :class="{ show: showQRModal }"
+      :style="{ display: showQRModal ? 'block' : 'none' }"
+      tabindex="-1"
+      @click.self="showQRModal = false"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header border-0">
+            <h5 class="modal-title fw-bold">Quét mã QR để thanh toán</h5>
+            <button
+              type="button"
+              class="btn-close"
+              @click="showQRModal = false"
+            ></button>
+          </div>
+          <div class="modal-body text-center py-3">
+            <h4 class="text-success mb-4">
+              Tổng tiền: {{ formatVND(finalTotal) }}
+            </h4>
+
+            <!-- Mã QR giả (bạn có thể thay bằng QR thật từ ngân hàng sau) -->
+            <img
+              :src="`https://qr.sepay.vn/img?acc=VQRQAGFYT0046&bank=MBBank&amount=${finalTotal}&des=HD${Date.now()}`"
+              alt="QR Code Thanh Toán"
+              class="img-fluid rounded shadow"
+            />
+            <div class="mt-4">
+              <small class="text-muted"
+                >Hướng dẫn khách quét mã bằng ứng dụng ngân hàng</small
+              >
+            </div>
+          </div>
+          <div class="modal-footer border-0 flex-column gap-2">
+            <button
+              class="btn btn-outline-secondary w-100"
+              @click="printReceipt"
+            >
+              <i class="bi bi-printer me-2"></i>In hóa đơn (sau khi hoàn tất)
+            </button>
+            <button
+              class="btn btn-success w-100 py-3 fw-bold"
+              @click="completeOrder"
+              :disabled="isProcessing"
+            >
+              <span
+                v-if="isProcessing"
+                class="spinner-border spinner-border-sm me-2"
+              ></span>
+              Xác nhận đã nhận tiền
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overlay chung cho cả 2 modal -->
+    <div
+      class="modal-backdrop fade"
+      :class="{ show: showCashModal || showQRModal }"
+      v-if="showCashModal || showQRModal"
+    ></div>
     <!-- Modal Giảm giá -->
     <div
       class="modal fade"
@@ -355,7 +533,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, nextTick } from "vue";
 import axios from "axios";
 
 // Base URL của backend
@@ -366,6 +544,15 @@ const allProducts = ref([]);
 const discountType = ref("none");
 const discountValue = ref(0);
 const showDiscountModal = ref(false);
+const isProcessing = ref(false);
+const selectedPaymentMethod = ref("cash");
+// Thêm các ref mới
+const showCashModal = ref(false);
+const showQRModal = ref(false);
+const cashReceived = ref(0);
+const change = ref(0);
+const cashInput = ref(null);
+
 // Sản phẩm hiển thị sau khi filter theo category
 const products = computed(() => {
   if (selectedCategory.value === "All Items") {
@@ -537,10 +724,96 @@ const clearDiscount = () => {
   discountValue.value = 0;
   showDiscountModal.value = false;
 };
+
+const openPaymentModal = () => {
+  if (cartItems.value.length === 0) return;
+
+  if (selectedPaymentMethod.value === "cash") {
+    showCashModal.value = true;
+    showQRModal.value = false;
+    // Focus vào ô nhập tiền ngay khi mở
+    nextTick(() => {
+      cashInput.value?.focus();
+    });
+  } else if (selectedPaymentMethod.value === "qr") {
+    showQRModal.value = true;
+    showCashModal.value = false;
+  }
+};
+
+// Tính tiền thối
+const calculateChange = () => {
+  change.value = cashReceived.value - finalTotal.value;
+};
+
+// Hàm in hóa đơn (tạm thời alert, sau bạn có thể dùng thư viện in thermal)
+const printReceipt = () => {
+  alert("Đang gửi lệnh in hóa đơn tới máy in nhiệt...");
+  // Có thể tích hợp với qz-tray, electron, hoặc web print sau
+};
+
 // Tự động gọi khi component được mount
 onMounted(() => {
   fetchProducts();
 });
+
+// Hàm hoàn tất đơn hàng
+const completeOrder = async () => {
+  isProcessing.value = true;
+
+  try {
+    const orderData = {
+      customerName: "Jane Doe",
+      customerPhone: null,
+      paymentMethod: selectedPaymentMethod.value === "cash" ? "Cash" : "QR",
+      subtotal: subtotal.value,
+      tax: tax.value,
+      discountAmount: discountAmount.value,
+      discountType:
+        discountType.value === "percent"
+          ? "Percent"
+          : discountType.value === "amount"
+          ? "Amount"
+          : "None",
+      discountValue: discountValue.value,
+      totalAmount: finalTotal.value,
+      cashReceived:
+        selectedPaymentMethod.value === "cash" ? cashReceived.value : null,
+      change: selectedPaymentMethod.value === "cash" ? change.value : null,
+      orderDate: new Date().toISOString(),
+      orderDetails: cartItems.value.map((item) => ({
+        productId: item.id,
+        quantity: item.qty,
+        unitPrice: item.priceRaw,
+        totalPrice: item.priceRaw * item.qty,
+      })),
+    };
+
+    const response = await axios.post(
+      "https://localhost:7189/api/Orders",
+      orderData
+    );
+
+    if (response.status === 201 || response.status === 200) {
+      alert("Thanh toán thành công! Đơn hàng đã được lưu.");
+
+      // Reset tất cả
+      cartItems.value = [];
+      clearDiscount();
+      cashReceived.value = 0;
+      change.value = 0;
+
+      // Đóng modal
+      showCashModal.value = false;
+      showQRModal.value = false;
+    }
+  } catch (error) {
+    console.error("Lỗi khi hoàn tất đơn hàng:", error);
+    alert("Thanh toán thất bại. Vui lòng thử lại.");
+  } finally {
+    isProcessing.value = false;
+  }
+};
 </script>
 
 <style scoped>
