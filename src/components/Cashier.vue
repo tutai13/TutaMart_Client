@@ -250,13 +250,14 @@
                 v-model="selectedPaymentMethod"
               />
               <label
-                class="btn btn-outline-success w-100 py-3 small position-relative"
+                class="btn btn-outline-success w-100 py-1 position-relative"
                 for="pay-cash"
               >
-                <i class="bi bi-cash fs-4 d-block mb-1"></i>
+                <i class="bi bi-cash fs-6 me-1"></i>
                 <small>Tiền mặt</small>
               </label>
             </div>
+
             <div class="col-6">
               <input
                 type="radio"
@@ -267,10 +268,10 @@
                 v-model="selectedPaymentMethod"
               />
               <label
-                class="btn btn-outline-success w-100 py-3 small position-relative"
+                class="btn btn-outline-success w-100 py-1 position-relative"
                 for="pay-qr"
               >
-                <i class="bi bi-qr-code-scan fs-4 d-block mb-1"></i>
+                <i class="bi bi-qr-code-scan fs-6 me-1"></i>
                 <small>QR Code</small>
               </label>
             </div>
@@ -338,25 +339,32 @@
               <small>Chưa đủ tiền!</small>
             </div>
           </div>
-          <div class="modal-footer border-0 flex-column gap-2">
-            <button
-              class="btn btn-outline-secondary w-100"
-              @click="printReceipt"
-              :disabled="change < 0"
-            >
-              <i class="bi bi-printer me-2"></i>In hóa đơn (sau khi hoàn tất)
-            </button>
-            <button
-              class="btn btn-success w-100 py-3 fw-bold"
-              @click="completeOrder"
-              :disabled="change < 0 || isProcessing"
-            >
-              <span
-                v-if="isProcessing"
-                class="spinner-border spinner-border-sm me-2"
-              ></span>
-              Hoàn tất thanh toán
-            </button>
+          <div class="modal-footer border-0">
+            <div class="row w-100 g-2">
+              <div class="col-4">
+                <button
+                  class="btn btn-outline-secondary w-100 h-100"
+                  @click="printReceipt"
+                  :disabled="change < 0"
+                >
+                  <i class="bi bi-printer me-2"></i>
+                  In hóa đơn
+                </button>
+              </div>
+              <div class="col-8">
+                <button
+                  class="btn btn-success w-100 py-3 fw-bold"
+                  @click="completeOrder"
+                  :disabled="change < 0 || isProcessing"
+                >
+                  <span
+                    v-if="isProcessing"
+                    class="spinner-border spinner-border-sm me-2"
+                  ></span>
+                  Hoàn tất thanh toán
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -380,7 +388,7 @@
               @click="closeQRModal"
             ></button>
           </div>
-          <div class="modal-body text-center py-5">
+          <div class="modal-body text-center py-3">
             <h4 class="text-success mb-4">
               Tổng tiền: {{ formatVND(finalTotal) }}
             </h4>
@@ -395,24 +403,29 @@
               >
             </div>
           </div>
-          <div class="modal-footer border-0 flex-column gap-2">
-            <button
-              class="btn btn-outline-secondary w-100"
-              @click="printReceipt"
-            >
-              <i class="bi bi-printer me-2"></i>In hóa đơn (sau khi hoàn tất)
-            </button>
-            <button
-              class="btn btn-success w-100 py-3 fw-bold"
-              @click="completeOrder"
-              :disabled="isProcessing"
-            >
-              <span
-                v-if="isProcessing"
-                class="spinner-border spinner-border-sm me-2"
-              ></span>
-              Xác nhận đã nhận tiền
-            </button>
+          <div class="modal-footer border-0">
+            <div class="d-flex w-100 gap-2">
+              <button
+                class="btn btn-outline-secondary"
+                style="flex: 3"
+                @click="printReceipt"
+              >
+                <i class="bi bi-printer me-2"></i>
+                In hóa đơn
+              </button>
+              <button
+                class="btn btn-success py-3 fw-bold"
+                style="flex: 7"
+                @click="completeOrder"
+                :disabled="isProcessing"
+              >
+                <span
+                  v-if="isProcessing"
+                  class="spinner-border spinner-border-sm me-2"
+                ></span>
+                Xác nhận đã nhận tiền
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -443,53 +456,67 @@
               @click="showDiscountModal = false"
             ></button>
           </div>
-          <div class="modal-body pt-2">
-            <div class="btn-group w-100 mb-3" role="group">
+
+          <!-- 👇 FORM BẮT ĐẦU Ở ĐÂY -->
+          <form @submit.prevent="applyDiscount">
+            <div class="modal-body pt-2">
+              <div class="btn-group w-100 mb-3" role="group">
+                <button
+                  type="button"
+                  class="btn btn-outline-primary"
+                  :class="{ 'active btn-primary': discountType === 'amount' }"
+                  @click="discountType = 'amount'"
+                >
+                  Theo tiền
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-outline-primary"
+                  :class="{ 'active btn-primary': discountType === 'percent' }"
+                  @click="discountType = 'percent'"
+                >
+                  Theo %
+                </button>
+              </div>
+
+              <div class="input-group">
+                <input
+                  type="number"
+                  class="form-control text-center"
+                  v-model.number="discountValue"
+                  :placeholder="
+                    discountType === 'percent' ? 'Nhập %' : 'Nhập số tiền'
+                  "
+                  min="0"
+                  autofocus
+                />
+                <span class="input-group-text">
+                  {{ discountType === "percent" ? "%" : "₫" }}
+                </span>
+              </div>
+
+              <small class="text-muted d-block text-center mt-2">
+                Tạm tính: {{ formatVND(subtotal) }} → Giảm:
+                {{ formatVND(discountAmount) }}
+              </small>
+            </div>
+
+            <div class="modal-footer border-0 pt-0">
               <button
-                class="btn btn-outline-primary"
-                :class="{ 'active btn-primary': discountType === 'amount' }"
-                @click="discountType = 'amount'"
+                type="button"
+                class="btn btn-secondary btn-sm"
+                @click="clearDiscount"
               >
-                Theo tiền
+                Xóa giảm giá
               </button>
-              <button
-                class="btn btn-outline-primary"
-                :class="{ 'active btn-primary': discountType === 'percent' }"
-                @click="discountType = 'percent'"
-              >
-                Theo %
+
+              <!-- 👇 submit -->
+              <button type="submit" class="btn btn-success btn-sm">
+                Áp dụng
               </button>
             </div>
-            <div class="input-group">
-              <input
-                type="number"
-                class="form-control text-center"
-                v-model.number="discountValue"
-                :placeholder="
-                  discountType === 'percent' ? 'Nhập %' : 'Nhập số tiền'
-                "
-                min="0"
-              />
-              <span class="input-group-text">{{
-                discountType === "percent" ? "%" : "₫"
-              }}</span>
-            </div>
-            <small class="text-muted d-block text-center mt-2">
-              Tạm tính: {{ formatVND(subtotal) }} → Giảm:
-              {{ formatVND(discountAmount) }}
-            </small>
-          </div>
-          <div class="modal-footer border-0 pt-0">
-            <button class="btn btn-secondary btn-sm" @click="clearDiscount">
-              Xóa giảm giá
-            </button>
-            <button
-              class="btn btn-success btn-sm"
-              @click="showDiscountModal = false"
-            >
-              Áp dụng
-            </button>
-          </div>
+          </form>
+          <!-- 👆 FORM KẾT THÚC -->
         </div>
       </div>
     </div>
@@ -532,10 +559,13 @@ const qrTimeout = ref(null);
 // Discount
 const discountType = ref("none");
 const discountValue = ref(0);
+const applyDiscount = () => {
+  showDiscountModal.value = false;
+};
 
 const qrCodeUrl = computed(() => {
   if (!referenceCode.value) return "";
-  return `https://qr.sepay.vn/img?acc=VQRQAGFYT0046&bank=MBBank&amount=${Math.round(
+  return `https://qr.sepay.vn/img?acc=VQRQAGIKX7826&bank=MBBank&amount=${Math.round(
     finalTotal.value
   )}&des=${encodeURIComponent(referenceCode.value)}`;
 });
@@ -545,7 +575,7 @@ const products = computed(() => {
   return allProducts.value.filter((p) => p.category === selectedCategory.value);
 });
 
-const fetchProducts = async () => {
+const loadProducts = async () => {
   try {
     const response = await axios.get(`https://localhost:7189/api/Products`);
     const data = response.data;
@@ -586,6 +616,15 @@ const selectCategory = (category) => {
 
 const addToCart = (product) => {
   const existingItem = cartItems.value.find((item) => item.id === product.id);
+
+  const newQuantity = existingItem ? existingItem.qty + 1 : 1;
+
+  if (newQuantity > product.stock) {
+    alert(
+      `Không thể thêm! Chỉ còn ${product.stock} sản phẩm "${product.name}" trong kho.`
+    );
+    return;
+  }
   if (existingItem) {
     existingItem.qty += 1;
     existingItem.total = new Intl.NumberFormat("vi-VN", {
@@ -606,10 +645,20 @@ const addToCart = (product) => {
 };
 
 const updateQty = (item, newQty) => {
+  const product = allProducts.value.find((p) => p.id === item.id);
+
+  if (!product) return;
+  if (newQty > product.stock) {
+    alert(
+      `Không thể tăng! Chỉ còn ${product.stock} sản phẩm "${item.name}" trong kho.`
+    );
+    return;
+  }
   if (newQty <= 0) {
     removeItem(item);
     return;
   }
+
   item.qty = newQty;
   item.total = new Intl.NumberFormat("vi-VN", {
     style: "currency",
@@ -680,7 +729,7 @@ const openPaymentModal = () => {
     // Sinh mã đơn hàng duy nhất
     const now = DateTime.local();
     referenceCode.value = "DH" + now.toFormat("yyyyMMddHHmmss");
-    console.log(referenceCode.value);
+    //console.log(referenceCode.value);
     startPolling();
 
     // Hết hạn sau 5 phút
@@ -735,6 +784,7 @@ const completeOrder = async () => {
     clearDiscount();
     showCashModal.value = false;
     showQRModal.value = false;
+    await loadProducts();
   } catch (error) {
     console.error("Lỗi khi hoàn tất đơn hàng:", error);
     alert("Thanh toán thất bại. Vui lòng thử lại.");
@@ -770,7 +820,7 @@ const closeQRModal = () => {
 };
 
 onMounted(() => {
-  fetchProducts();
+  loadProducts();
 });
 </script>
 
