@@ -5,7 +5,8 @@
       <div class="col-12 col-lg-7">
         <h3 class="fw-bold mb-1">Order History</h3>
         <p class="text-muted small mb-0">
-          Manage and track all customer orders, payments, and fulfillments.
+          Quản lý và theo dõi tất cả đơn hàng, thanh toán và trạng thái hoàn
+          thành.
         </p>
       </div>
       <div class="col-12 col-lg-5 text-lg-end">
@@ -14,7 +15,7 @@
             <i class="bi bi-file-earmark-arrow-down me-1"></i> Export
           </button>
           <button class="btn btn-success btn-sm fw-bold">
-            <i class="bi bi-plus-lg me-1"></i> New Order
+            <i class="bi bi-plus-lg me-1"></i> Tạo đơn mới
           </button>
         </div>
       </div>
@@ -25,42 +26,61 @@
       <div class="card-body p-3">
         <div class="row g-3 align-items-center">
           <!-- Search -->
-          <div class="col-12 col-lg-4">
+          <div class="col-12 col-md-4 col-lg-3">
             <div class="input-group">
               <span class="input-group-text bg-transparent border-end-0">
                 <i class="bi bi-search"></i>
               </span>
               <input
+                v-model="searchQuery"
                 type="text"
                 class="form-control border-start-0 ps-0 small"
-                placeholder="Search by Order ID or Customer Name"
+                placeholder="Tìm theo ID đơn hoặc tên khách"
+                @keyup.enter="fetchOrders(1)"
               />
             </div>
           </div>
 
           <!-- Date Range -->
-          <div class="col-12 col-lg-4">
+          <div class="col-12 col-md-5 col-lg-4">
             <div class="row g-2">
               <div class="col-6">
-                <input type="date" class="form-control form-control-sm small" />
+                <input
+                  v-model="dateFrom"
+                  type="date"
+                  class="form-control form-control-sm small"
+                  :max="dateTo || maxDate"
+                />
               </div>
               <div class="col-6">
-                <input type="date" class="form-control form-control-sm small" />
+                <input
+                  v-model="dateTo"
+                  type="date"
+                  class="form-control form-control-sm small"
+                  :min="dateFrom"
+                  :max="maxDate"
+                />
               </div>
             </div>
           </div>
 
-          <!-- Status & Sort -->
-          <div class="col-12 col-lg-4">
-            <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
-              <button class="btn btn-outline-secondary btn-sm small">
-                Status: All <i class="bi bi-chevron-down ms-1"></i>
+          <!-- Actions -->
+          <div class="col-12 col-md-3 col-lg-5 text-md-end">
+            <div class="d-flex gap-2 justify-content-md-end flex-wrap">
+              <button
+                class="btn btn-outline-secondary btn-sm"
+                @click="resetFilters"
+              >
+                <i class="bi bi-arrow-counterclockwise me-1"></i> Reset
               </button>
-              <button class="btn btn-outline-secondary btn-sm small">
-                Payment: All <i class="bi bi-chevron-down ms-1"></i>
+              <button class="btn btn-primary btn-sm" @click="fetchOrders(1)">
+                <i class="bi bi-filter me-1"></i> Lọc
               </button>
-              <button class="btn btn-outline-secondary btn-sm small">
-                Sort: Newest <i class="bi bi-sort-down ms-1"></i>
+              <button
+                class="btn btn-outline-secondary btn-sm"
+                @click="fetchOrders(1)"
+              >
+                <i class="bi bi-arrow-repeat me-1"></i> Refresh
               </button>
             </div>
           </div>
@@ -75,50 +95,79 @@
           <thead class="bg-light">
             <tr>
               <th class="text-uppercase text-muted small ps-4">Order ID</th>
-              <th class="text-uppercase text-muted small">Date & Time</th>
-              <th class="text-uppercase text-muted small">Customer</th>
+              <th class="text-uppercase text-muted small">Ngày & Giờ</th>
+              <th class="text-uppercase text-muted small">Khách hàng</th>
               <th class="text-uppercase text-muted small text-end">
-                Total Amount
+                Tổng tiền
               </th>
-              <th class="text-uppercase text-muted small">Payment Status</th>
+              <th class="text-uppercase text-muted small">Thanh toán</th>
               <th class="text-uppercase text-muted small text-center">
-                Action
+                Số món
+              </th>
+              <th class="text-uppercase text-muted small text-center">
+                Chi tiết
               </th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="order in orders" :key="order.id" class="hover-bg-light">
-              <td class="ps-4 py-3 fw-bold">{{ order.id }}</td>
+            <tr
+              v-for="order in orders"
+              :key="order.orderId"
+              class="hover-bg-light"
+            >
+              <td class="ps-4 py-3 fw-bold">#{{ order.orderId }}</td>
               <td class="py-3">
-                <div>{{ order.date }}</div>
-                <small class="text-muted">{{ order.time }}</small>
+                <div>{{ formatDate(order.orderDate) }}</div>
+                <small class="text-muted">{{
+                  formatTime(order.orderDate)
+                }}</small>
               </td>
               <td class="py-3">
                 <div class="d-flex align-items-center gap-2">
                   <div
-                    class="bg-secondary bg-opacity-20 rounded-circle d-flex align-items-center justify-content-center text-xs fw-bold"
+                    class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center text-xs fw-bold"
                     style="width: 32px; height: 32px"
                   >
-                    {{ order.customerInitials }}
+                    {{ getInitials(order.customerName) }}
                   </div>
-                  <span>{{ order.customer }}</span>
+                  <span>{{ order.customerName || "Khách vãng lai" }}</span>
                 </div>
               </td>
-              <td class="py-3 text-end fw-bold">{{ order.amount }}</td>
+              <td class="py-3 text-end fw-bold">
+                {{ formatCurrency(order.totalAmount) }}
+              </td>
               <td class="py-3">
-                <span class="badge" :class="order.statusClass">
-                  <span
-                    class="rounded-circle me-1"
-                    style="width: 8px; height: 8px; display: inline-block"
-                    :class="order.statusDot"
-                  ></span>
-                  {{ order.status }}
+                <span
+                  class="badge rounded-pill px-3 py-2 fw-medium"
+                  :class="getPaymentBadgeClass(order.paymentMethod)"
+                >
+                  {{ order.paymentMethod || "—" }}
                 </span>
               </td>
+              <td class="py-3 text-center fw-medium">
+                {{ order.totalItems }}
+              </td>
               <td class="py-3 text-center">
-                <button class="btn btn-link text-success small fw-medium p-0">
-                  View Details <i class="bi bi-arrow-right ms-1"></i>
-                </button>
+                <router-link
+                  :to="{ name: 'OrderDetail', params: { id: order.orderId } }"
+                  class="btn btn-link text-primary small fw-medium p-0"
+                >
+                  View <i class="bi bi-arrow-right ms-1"></i>
+                </router-link>
+              </td>
+            </tr>
+
+            <tr v-if="loading">
+              <td colspan="7" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Đang tải...</span>
+                </div>
+              </td>
+            </tr>
+
+            <tr v-else-if="orders.length === 0">
+              <td colspan="7" class="text-center py-5 text-muted">
+                Không tìm thấy đơn hàng nào
               </td>
             </tr>
           </tbody>
@@ -130,29 +179,68 @@
         class="card-footer bg-transparent border-top d-flex flex-column flex-sm-row justify-content-between align-items-center py-3 px-4 gap-3"
       >
         <small class="text-muted">
-          Showing <strong>1</strong> to <strong>5</strong> of
-          <strong>50</strong> entries
+          Hiển thị <strong>{{ pagination.from }}</strong> đến
+          <strong>{{ pagination.to }}</strong> trong tổng số
+          <strong>{{ pagination.totalRecords }}</strong> đơn hàng
         </small>
-        <nav aria-label="Page navigation">
+
+        <nav aria-label="Page navigation" v-if="pagination.totalPages > 1">
           <ul class="pagination pagination-sm mb-0">
-            <li class="page-item disabled">
-              <a class="page-link" href="#"
-                ><i class="bi bi-chevron-left"></i
-              ></a>
+            <li
+              class="page-item"
+              :class="{ disabled: pagination.currentPage === 1 }"
+            >
+              <button class="page-link" @click="fetchOrders(1)">Đầu</button>
             </li>
-            <li class="page-item active">
-              <a class="page-link" href="#">1</a>
+            <li
+              class="page-item"
+              :class="{ disabled: pagination.currentPage === 1 }"
+            >
+              <button
+                class="page-link"
+                @click="fetchOrders(pagination.currentPage - 1)"
+              >
+                <i class="bi bi-chevron-left"></i>
+              </button>
             </li>
-            <li class="page-item"><a class="page-link" href="#">2</a></li>
-            <li class="page-item"><a class="page-link" href="#">3</a></li>
-            <li class="page-item disabled">
-              <span class="page-link">...</span>
+
+            <li
+              v-for="n in Math.min(pagination.totalPages, 7)"
+              :key="n"
+              class="page-item"
+              :class="{
+                active: n === pagination.currentPage,
+                'd-none':
+                  n > 3 &&
+                  n < pagination.totalPages - 3 &&
+                  pagination.totalPages > 7,
+              }"
+            >
+              <button
+                v-if="
+                  n <= 3 ||
+                  n >= pagination.totalPages - 3 ||
+                  pagination.totalPages <= 7
+                "
+                class="page-link"
+                @click="fetchOrders(n)"
+              >
+                {{ n }}
+              </button>
             </li>
-            <li class="page-item"><a class="page-link" href="#">10</a></li>
-            <li class="page-item">
-              <a class="page-link" href="#"
-                ><i class="bi bi-chevron-right"></i
-              ></a>
+
+            <li
+              class="page-item"
+              :class="{
+                disabled: pagination.currentPage === pagination.totalPages,
+              }"
+            >
+              <button
+                class="page-link"
+                @click="fetchOrders(pagination.currentPage + 1)"
+              >
+                <i class="bi bi-chevron-right"></i>
+              </button>
             </li>
           </ul>
         </nav>
@@ -162,73 +250,147 @@
 </template>
 
 <script setup>
-const orders = [
-  {
-    id: "#ORD-7352",
-    date: "Oct 24, 2023",
-    time: "02:30 PM",
-    customer: "Alice Johnson",
-    customerInitials: "AJ",
-    amount: "$45.20",
-    status: "Paid",
-    statusClass: "bg-success bg-opacity-10 text-success",
-    statusDot: "bg-success",
-  },
-  {
-    id: "#ORD-7351",
-    date: "Oct 24, 2023",
-    time: "01:15 PM",
-    customer: "Walk-in Customer",
-    customerInitials: "",
-    amount: "$12.50",
-    status: "Pending",
-    statusClass: "bg-warning bg-opacity-10 text-warning",
-    statusDot: "bg-warning",
-  },
-  {
-    id: "#ORD-7350",
-    date: "Oct 23, 2023",
-    time: "11:45 AM",
-    customer: "Michael K.",
-    customerInitials: "MK",
-    amount: "$120.00",
-    status: "Paid",
-    statusClass: "bg-success bg-opacity-10 text-success",
-    statusDot: "bg-success",
-  },
-  {
-    id: "#ORD-7349",
-    date: "Oct 23, 2023",
-    time: "09:10 AM",
-    customer: "Sarah Lee",
-    customerInitials: "SL",
-    amount: "$8.50",
-    status: "Failed",
-    statusClass: "bg-danger bg-opacity-10 text-danger",
-    statusDot: "bg-danger",
-  },
-  {
-    id: "#ORD-7348",
-    date: "Oct 22, 2023",
-    time: "05:45 PM",
-    customer: "John Doe",
-    customerInitials: "JD",
-    amount: "$210.00",
-    status: "Paid",
-    statusClass: "bg-success bg-opacity-10 text-success",
-    statusDot: "bg-success",
-  },
-];
+import { ref, onMounted, computed } from "vue";
+import axios from "axios";
+
+const orders = ref([]);
+const loading = ref(false);
+const searchQuery = ref("");
+const dateFrom = ref("");
+const dateTo = ref("");
+
+const maxDate = computed(() => new Date().toISOString().split("T")[0]); // hôm nay
+
+const pagination = ref({
+  currentPage: 1,
+  pageSize: 5,
+  totalRecords: 0,
+  totalPages: 1,
+  from: 1,
+  to: 5,
+});
+
+const API_BASE = "https://localhost:7189/api"; // thay đổi khi deploy
+
+async function fetchOrders(page = 1) {
+  try {
+    loading.value = true;
+    pagination.value.currentPage = page;
+
+    const params = {
+      page,
+      pageSize: pagination.value.pageSize,
+    };
+
+    // Chỉ gửi khi có giá trị
+    if (dateFrom.value)
+      params.fromDate = new Date(dateFrom.value).toISOString();
+    if (dateTo.value) params.toDate = new Date(dateTo.value).toISOString();
+
+    // Search (nếu backend sau này hỗ trợ thì mở)
+    // if (searchQuery.value.trim()) params.search = searchQuery.value.trim()
+
+    const response = await axios.get(`${API_BASE}/Orders`, { params });
+
+    const {
+      data,
+      page: curPage,
+      pageSize,
+      totalRecords,
+      totalPages,
+    } = response.data;
+
+    orders.value = data;
+    pagination.value = {
+      currentPage: curPage,
+      pageSize,
+      totalRecords,
+      totalPages,
+      from: totalRecords === 0 ? 0 : (curPage - 1) * pageSize + 1,
+      to: Math.min(curPage * pageSize, totalRecords),
+    };
+  } catch (error) {
+    console.error("Lỗi tải danh sách đơn hàng:", error);
+    alert("Không thể tải danh sách đơn hàng. Vui lòng thử lại sau.");
+  } finally {
+    loading.value = false;
+  }
+}
+
+function resetFilters() {
+  searchQuery.value = "";
+  dateFrom.value = "";
+  dateTo.value = "";
+  fetchOrders(1);
+}
+
+// Helpers
+const formatDate = (iso) => {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const formatTime = (iso) => {
+  if (!iso) return "";
+  return new Date(iso).toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const formatCurrency = (amount) => {
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    minimumFractionDigits: 0,
+  }).format(amount || 0);
+};
+
+const getInitials = (name) => {
+  if (!name?.trim()) return "??";
+  const parts = name.trim().split(/\s+/);
+  return (
+    parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")
+  ).toUpperCase();
+};
+
+const getPaymentBadgeClass = (method) => {
+  if (!method) return "bg-secondary bg-opacity-10 text-secondary";
+  const m = method.toLowerCase();
+  if (
+    m.includes("qr") ||
+    m.includes("vnpay") ||
+    m.includes("momo") ||
+    m.includes("bank")
+  ) {
+    return "bg-info bg-opacity-10 text-info";
+  }
+  if (m.includes("cash") || m.includes("tiền mặt")) {
+    return "bg-success bg-opacity-10 text-success";
+  }
+  return "bg-primary bg-opacity-10 text-primary";
+};
+
+onMounted(() => {
+  fetchOrders(1);
+});
 </script>
 
 <style scoped>
 .hover-bg-light:hover {
-  background-color: rgba(0, 255, 0, 0.03);
+  background-color: rgba(0, 123, 255, 0.04);
 }
 .card {
   transition: all 0.2s ease;
 }
 .card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+.badge.rounded-pill {
+  font-size: 0.8rem;
 }
 </style>
